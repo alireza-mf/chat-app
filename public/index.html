@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta http-equiv="X-UA-Compatible" content="ie=edge" />
+		<link
+			rel="stylesheet"
+			href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.12.1/css/all.min.css"
+			integrity="sha256-mmgLkCYLUQbXn0B1SRqzHar6dCnv9oZFPEC1g1cwlkk="
+			crossorigin="anonymous"
+		/>
+		<link rel="stylesheet" href="css/style.css" />
+		<title>Chat App</title>
+	</head>
+	<body>
+		<div id="app">
+		<div v-if="!ready">
+			<div class="join-container" >
+				<header class="join-header">
+					<h1><i class="fas fa-smile"></i> Chat App</h1>
+				</header>
+				<main class="join-main">
+					<form @submit.prevent="addUser">
+						<div class="form-control">
+							<label for="username">Username</label>
+							<input
+								class="effect-2"
+								type="text"
+								name="username"
+								v-model="username"
+								placeholder="Enter username..."
+								required
+							/>
+							<span class="focus-border"></span>
+						</div>
+						<div class="form-control">
+							<label for="room">Room</label>
+							<select name="room" v-model="room">
+								<option value="First Room">First Room</option>
+								<option value="Second Room">Second Room</option>
+								<option value="Third Room">Third Room</option>
+								<option value="Fourth Room">Fourth Room</option>
+								<option value="Fifth Room">Fifth Room</option>
+							</select>
+						</div>
+						<button type="submit" class="btn">Join Chat</button>
+					</form>
+				</main>
+			</div>
+		</div>
+
+		
+		<div class="chat-container" v-else>
+      <header class="chat-header">
+        <h1><i class="fas fa-smile"></i> Chat App</h1>
+					<a href="" class="btn">Leave Room</a>
+      </header>
+      <main class="chat-main">
+        <div class="chat-sidebar">
+          <h3><i class="fas fa-comments"></i> Room Name:</h3>
+          <h2>{{room}}</h2>
+          <h3><i class="fas fa-users"></i> Users:</h3>
+					<ul>
+					<li v-for="u in users">{{u.username}}</li>
+					</ul>
+				</div>
+        <div class="chat-messages" v-chat-scroll="{smooth: true}">
+					<div v-for="m in msgs">
+						<div class="mymessage" v-if="m.username===username">
+						<span class="meta">{{m.username}}</span><span>{{m.time}}</span>
+						<p class="text">
+							{{m.text}}
+						</p>
+						</div>
+						<div class="message" v-else>
+							<span class="meta">{{m.username}}</span><span>{{m.time}}</span>
+							<p class="text">
+								{{m.text}}
+							</p>
+							</div>
+					</div>
+					<div class="typing">
+						<i><small v-if="uniqtyping.length==1">{{uniqtyping[0]}} is typing...</small></i>
+						<i><small v-if="uniqtyping.length==0"></small></i>
+						<i><small v-if="uniqtyping.length>=2">{{uniqtyping.length}} Users are typing...</small></i>
+					</div>
+				</div>
+      </main>
+      <div class="chat-form-container">
+        <form @submit.prevent="send">
+					<input
+						class="effect-2"
+						type="text"
+						ref="newmessage"
+            placeholder="Enter Message"
+            v-model="newMessage"
+						required
+					/>
+					<span class="focus-border"></span>
+          <button class="btn"><i class="fas fa-paper-plane"></i> Send</button>
+        </form>
+      </div>
+		</div>
+	</div>
+	</body>
+
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.10/vue.js"></script>
+	<script src="/socket.io/socket.io.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/vue-chat-scroll/dist/vue-chat-scroll.min.js"></script>
+	
+  <script>
+		var socket = io();
+		let vue = new Vue({
+			el: '#app',
+	
+			data: {
+				username: null,
+				room: "First Room",
+				users:[],
+				typing: [],
+				uniqtyping: [],
+				newMessage: null,
+				msgs: [],
+				time:null,
+				ready: false,
+			},
+	
+	
+			created() {
+				// Get room users
+				socket.on('roomUsers', ({ room, users }) => {
+					this.room = room
+					this.users = users
+				});
+
+				// Get message from server
+				socket.on('message', message => {
+					console.log(message);
+					this.msgs.push({
+						text: message.text,
+						username: message.username,
+						time: message.time
+					});
+				});
+
+				socket.on('typing', message => {
+					this.typing.push(  
+						message
+					)
+					this.uniqtyping = this.typing.filter(function(item, i, ar){ return ar.indexOf(item) === i; }) ;
+        });
+		
+        socket.on('stopTyping', () => {
+					this.typing = [] ;
+					this.uniqtyping = [] ;
+        });
+	
+			},
+
+			watch: {
+        newMessage(value) {
+					value ? socket.emit('typing', this.username) : socket.emit('stopTyping')
+				},
+			},
+
+			methods: {
+				// Message submit
+				send() {
+					socket.emit('chatMessage', 
+						(this.newMessage)
+					);
+					this.newMessage = null;
+					this.$refs.newmessage.focus()
+				},
+
+				addUser() {
+					socket.emit('joinRoom', { username: this.username, room: this.room } );
+					this.ready = true;
+				},
+
+			},
+		});
+		</script>
+  </script>
+</html>
